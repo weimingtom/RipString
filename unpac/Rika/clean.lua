@@ -1,0 +1,5 @@
+os.execute("del *.wav")
+os.execute("del *.bmz")
+os.execute("del *.ttp")
+os.execute("del *.txt")
+os.execute("del out.pac")
