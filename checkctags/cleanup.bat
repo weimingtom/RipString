@@ -1,0 +1,1 @@
+@del *.dot *.gif *.txt
