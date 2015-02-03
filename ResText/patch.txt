@@ -1,0 +1,283 @@
+ResText无法抽取资源字符串的问题
+
+
+用ResText提取nscr.exe的资源字符串时发现此问题。
+对于一些比较古老的exe来说，ResText.exe可能会导致字符串指针低位转换问题：
+不过这个问题只发生在某些古老exe的资源提取中，所以其实不算是bug（=_=b）
+* 有些资源ID可能会导致IS_INTRESOURCE返回假（其实此时nID是某个字符串的指针）。
+* 对字符串执行LOWORD可能导致指针数值发生改变。
+* MAKEINTRESOURCE可能导致整数无法转回宽字节字符串指针。
+（注：ResText是TortoiseSVN中本地化exe资源的控制台工具，可用于汉化）。
+另外ResText只接受完整路径的exe输入文件名，不可以用相对路径。
+
+补丁如下：
+
+
+Index: ResModule.cpp
+===================================================================
+--- ResModule.cpp	(revision 20612)
++++ ResModule.cpp	(working copy)
+@@ -21,6 +21,10 @@
+ 
+ #define MYERROR {CUtils::Error(); return FALSE;}
+ 
++//FIXME:
++#undef IS_INTRESOURCE
++#define IS_INTRESOURCE(x) (1)
++
+ CResModule::CResModule(void)
+     : m_bTranslatedStrings(0)
+     , m_bDefaultStrings(0)
+@@ -231,7 +235,8 @@
+ 
+ BOOL CResModule::ExtractString(UINT nID)
+ {
+-    HRSRC       hrsrc = FindResource(m_hResDll, MAKEINTRESOURCE(nID), RT_STRING);
++	WCHAR *     pID = (WCHAR *)nID;
++    HRSRC       hrsrc = FindResource(m_hResDll, pID/*MAKEINTRESOURCE(nID)*/, RT_STRING);
+     HGLOBAL     hglStringTable;
+     LPWSTR      p;
+ 
+@@ -286,7 +291,8 @@
+ 
+ BOOL CResModule::ReplaceString(UINT nID, WORD wLanguage)
+ {
+-    HRSRC       hrsrc = FindResourceEx(m_hResDll, RT_STRING, MAKEINTRESOURCE(nID), wLanguage);
++	WCHAR *     pID = (WCHAR *)nID;
++    HRSRC       hrsrc = FindResourceEx(m_hResDll, RT_STRING, pID/*MAKEINTRESOURCE(nID)*/, wLanguage);
+     HGLOBAL     hglStringTable;
+     LPWSTR      p;
+ 
+@@ -374,13 +380,13 @@
+         delete [] pBuf;
+     }
+ 
+-    if (!UpdateResource(m_hUpdateRes, RT_STRING, MAKEINTRESOURCE(nID), (m_wTargetLang ? m_wTargetLang : wLanguage), newTable, (DWORD)(nMem + (nMem % 2))*2))
++    if (!UpdateResource(m_hUpdateRes, RT_STRING, pID/*MAKEINTRESOURCE(nID)*/, (m_wTargetLang ? m_wTargetLang : wLanguage), newTable, (DWORD)(nMem + (nMem % 2))*2))
+     {
+         delete [] newTable;
+         goto DONE_ERROR;
+     }
+ 
+-    if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_STRING, MAKEINTRESOURCE(nID), wLanguage, NULL, 0)))
++    if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_STRING, pID/*MAKEINTRESOURCE(nID)*/, wLanguage, NULL, 0)))
+     {
+         delete [] newTable;
+         goto DONE_ERROR;
+@@ -397,7 +403,8 @@
+ 
+ BOOL CResModule::ExtractMenu(UINT nID)
+ {
+-    HRSRC       hrsrc = FindResource(m_hResDll, MAKEINTRESOURCE(nID), RT_MENU);
++	WCHAR *     pID = (WCHAR *)nID;
++    HRSRC       hrsrc = FindResource(m_hResDll, pID/*MAKEINTRESOURCE(nID)*/, RT_MENU);
+     HGLOBAL     hglMenuTemplate;
+     WORD        version, offset;
+     DWORD dwHelpId;
+@@ -469,7 +476,8 @@
+ 
+ BOOL CResModule::ReplaceMenu(UINT nID, WORD wLanguage)
+ {
+-    HRSRC       hrsrc = FindResourceEx(m_hResDll, RT_MENU, MAKEINTRESOURCE(nID), wLanguage);
++	WCHAR *     pID = (WCHAR *)nID;
++    HRSRC       hrsrc = FindResourceEx(m_hResDll, RT_MENU, pID/*MAKEINTRESOURCE(nID)*/, wLanguage);
+     HGLOBAL     hglMenuTemplate;
+     WORD        version, offset;
+     LPWSTR      p;
+@@ -524,13 +532,13 @@
+                 goto DONE_ERROR;
+             }
+ 
+-            if (!UpdateResource(m_hUpdateRes, RT_MENU, MAKEINTRESOURCE(nID), (m_wTargetLang ? m_wTargetLang : wLanguage), newMenu, (DWORD)(nMem + (nMem % 2)+2)*2))
++            if (!UpdateResource(m_hUpdateRes, RT_MENU, pID/*MAKEINTRESOURCE(nID)*/, (m_wTargetLang ? m_wTargetLang : wLanguage), newMenu, (DWORD)(nMem + (nMem % 2)+2)*2))
+             {
+                 delete [] newMenu;
+                 goto DONE_ERROR;
+             }
+ 
+-            if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_MENU, MAKEINTRESOURCE(nID), wLanguage, NULL, 0)))
++            if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_MENU, pID/*MAKEINTRESOURCE(nID)*/, wLanguage, NULL, 0)))
+             {
+                 delete [] newMenu;
+                 goto DONE_ERROR;
+@@ -556,13 +564,13 @@
+                 goto DONE_ERROR;
+             }
+ 
+-            if (!UpdateResource(m_hUpdateRes, RT_MENU, MAKEINTRESOURCE(nID), (m_wTargetLang ? m_wTargetLang : wLanguage), newMenu, (DWORD)(nMem + (nMem % 2) + 4) * 2))
++            if (!UpdateResource(m_hUpdateRes, RT_MENU, pID/*MAKEINTRESOURCE(nID)*/, (m_wTargetLang ? m_wTargetLang : wLanguage), newMenu, (DWORD)(nMem + (nMem % 2) + 4) * 2))
+             {
+                 delete [] newMenu;
+                 goto DONE_ERROR;
+             }
+ 
+-            if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_MENU, MAKEINTRESOURCE(nID), wLanguage, NULL, 0)))
++            if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_MENU, pID/*MAKEINTRESOURCE(nID)*/, wLanguage, NULL, 0)))
+             {
+                 delete [] newMenu;
+                 goto DONE_ERROR;
+@@ -886,7 +894,8 @@
+ 
+ BOOL CResModule::ExtractAccelerator(UINT nID)
+ {
+-    HRSRC       hrsrc = FindResource(m_hResDll, MAKEINTRESOURCE(nID), RT_ACCELERATOR);
++	WCHAR *     pID = (WCHAR *)nID;
++    HRSRC       hrsrc = FindResource(m_hResDll, pID/*MAKEINTRESOURCE(nID)*/, RT_ACCELERATOR);
+     HGLOBAL     hglAccTable;
+     WORD        fFlags, wAnsi, wID;
+     const WORD* p;
+@@ -1018,7 +1027,8 @@
+     const WORD* p;
+     int         i;
+ 
+-    haccelOld = LoadAccelerators(m_hResDll, MAKEINTRESOURCE(nID));
++	WCHAR *     pID = (WCHAR *)nID;
++    haccelOld = LoadAccelerators(m_hResDll, pID/*MAKEINTRESOURCE(nID)*/);
+ 
+     if (haccelOld == NULL)
+         MYERROR;
+@@ -1125,13 +1135,13 @@
+         p++;
+     }
+ 
+-    if (!UpdateResource(m_hUpdateRes, RT_ACCELERATOR, MAKEINTRESOURCE(nID),
++    if (!UpdateResource(m_hUpdateRes, RT_ACCELERATOR, pID/*MAKEINTRESOURCE(nID)*/,
+         (m_wTargetLang ? m_wTargetLang : wLanguage), hglAccTableNew /* haccelNew*/, cAccelerators * 4 * sizeof(WORD)))
+     {
+         goto DONE_ERROR;
+     }
+ 
+-    if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_ACCELERATOR, MAKEINTRESOURCE(nID), wLanguage, NULL, 0)))
++    if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_ACCELERATOR, pID/*MAKEINTRESOURCE(nID)*/, wLanguage, NULL, 0)))
+     {
+         goto DONE_ERROR;
+     }
+@@ -1154,7 +1164,8 @@
+     HRSRC       hrsrc;
+     HGLOBAL     hGlblDlgTemplate;
+ 
+-    hrsrc = FindResource(m_hResDll, MAKEINTRESOURCE(nID), RT_DIALOG);
++	WCHAR *pID = (WCHAR *)nID;
++    hrsrc = FindResource(m_hResDll, pID/*MAKEINTRESOURCE(nID)*/, RT_DIALOG);
+ 
+     if (hrsrc == NULL)
+         MYERROR;
+@@ -1220,7 +1231,8 @@
+     HRSRC       hrsrc;
+     HGLOBAL     hGlblDlgTemplate;
+ 
+-    hrsrc = FindResourceEx(m_hResDll, RT_DIALOG, MAKEINTRESOURCE(nID), wLanguage);
++	WCHAR *     pID = (WCHAR *)nID;
++    hrsrc = FindResourceEx(m_hResDll, RT_DIALOG, pID/*MAKEINTRESOURCE(nID)*/, wLanguage);
+ 
+     if (hrsrc == NULL)
+         MYERROR;
+@@ -1249,13 +1261,13 @@
+         goto DONE_ERROR;
+     }
+ 
+-    if (!UpdateResource(m_hUpdateRes, RT_DIALOG, MAKEINTRESOURCE(nID), (m_wTargetLang ? m_wTargetLang : wLanguage), newDialog, (DWORD)(nMem + (nMem % 2))*2))
++    if (!UpdateResource(m_hUpdateRes, RT_DIALOG, pID/*MAKEINTRESOURCE(nID)*/, (m_wTargetLang ? m_wTargetLang : wLanguage), newDialog, (DWORD)(nMem + (nMem % 2))*2))
+     {
+         delete [] newDialog;
+         goto DONE_ERROR;
+     }
+ 
+-    if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_DIALOG, MAKEINTRESOURCE(nID), wLanguage, NULL, 0)))
++    if ((m_wTargetLang)&&(!UpdateResource(m_hUpdateRes, RT_DIALOG, pID/*MAKEINTRESOURCE(nID)*/, wLanguage, NULL, 0)))
+     {
+         delete [] newDialog;
+         goto DONE_ERROR;
+@@ -1792,15 +1804,19 @@
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            if (!lpResModule->ExtractString(LOWORD(lpszName)))
++            //if (!lpResModule->ExtractString(LOWORD(lpszName)))
++            //    return FALSE;
++            if (!lpResModule->ExtractString((UINT)(lpszName)))
+                 return FALSE;
+-        }
++		}
+     }
+     else if (lpszType == RT_MENU)
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            if (!lpResModule->ExtractMenu(LOWORD(lpszName)))
++            //if (!lpResModule->ExtractMenu(LOWORD(lpszName)))
++            //    return FALSE;
++            if (!lpResModule->ExtractMenu((UINT)(lpszName)))
+                 return FALSE;
+         }
+     }
+@@ -1808,7 +1824,9 @@
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            if (!lpResModule->ExtractDialog(LOWORD(lpszName)))
++            //if (!lpResModule->ExtractDialog(LOWORD(lpszName)))
++            //    return FALSE;
++            if (!lpResModule->ExtractDialog((UINT)(lpszName)))
+                 return FALSE;
+         }
+     }
+@@ -1816,7 +1834,9 @@
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            if (!lpResModule->ExtractAccelerator(LOWORD(lpszName)))
++            //if (!lpResModule->ExtractAccelerator(LOWORD(lpszName)))
++            //    return FALSE;
++            if (!lpResModule->ExtractAccelerator((UINT)(lpszName)))
+                 return FALSE;
+         }
+     }
+@@ -1842,29 +1862,33 @@
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            bRes = lpResModule->ReplaceString(LOWORD(lpszName), wLanguage);
++            //bRes = lpResModule->ReplaceString(LOWORD(lpszName), wLanguage);
++			bRes = lpResModule->ReplaceString((UINT)(lpszName), wLanguage);
+         }
+     }
+     else if (lpszType == RT_MENU)
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            bRes = lpResModule->ReplaceMenu(LOWORD(lpszName), wLanguage);
+-        }
++            //bRes = lpResModule->ReplaceMenu(LOWORD(lpszName), wLanguage);
++            bRes = lpResModule->ReplaceMenu((UINT)(lpszName), wLanguage);
++		}
+     }
+     else if (lpszType == RT_DIALOG)
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            bRes = lpResModule->ReplaceDialog(LOWORD(lpszName), wLanguage);
+-        }
++            //bRes = lpResModule->ReplaceDialog(LOWORD(lpszName), wLanguage);
++            bRes = lpResModule->ReplaceDialog((UINT)(lpszName), wLanguage);
++		}
+     }
+     else if (lpszType == RT_ACCELERATOR)
+     {
+         if (IS_INTRESOURCE(lpszName))
+         {
+-            bRes = lpResModule->ReplaceAccelerator(LOWORD(lpszName), wLanguage);
+-        }
++            //bRes = lpResModule->ReplaceAccelerator(LOWORD(lpszName), wLanguage);
++            bRes = lpResModule->ReplaceAccelerator((UINT)(lpszName), wLanguage);
++		}
+     }
+ 
+     return bRes;
+
+
+
+我的ResText修改版和演示放在我的SVN中：
+svn://www.svnhost.cn/weimingtom_mmcstudy/ResText_demo
+
+

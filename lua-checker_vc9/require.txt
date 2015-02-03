@@ -1,0 +1,11 @@
+lua-checker
+http://code.google.com/p/lua-checker/
+
+flex 
+http://dinosaur.compilertools.net/
+
+cygwin
+http://www.cygwin.com/
+
+bison
+http://www.gnu.org/software/bison/
