@@ -1,0 +1,8 @@
+origin source downloaded here
+http://downloads.mysql.com/archives/community/
+
+select 5.1.49
+then select Source Code
+then download mysql-5.1.49.tar.gz
+
+http://downloads.mysql.com/archives/get/file/mysql-5.1.49.tar.gz
