@@ -1,0 +1,8 @@
+os.execute("del *.ogg")
+--os.execute("del *.png")
+os.execute("del *.sli")
+os.execute("del *.db")
+os.execute("del *.rft")
+os.execute("del *.iet")
+os.execute("del *.txt")
+os.execute("del *.ini")
